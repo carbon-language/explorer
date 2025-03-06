@@ -126,10 +126,9 @@ auto FileContext::BuildDICompileUnit(llvm::StringRef module_name,
                                       /*RV=*/0);
 }
 
-auto FileContext::GetGlobal(SemIR::InstId inst_id) -> llvm::Value* {
-  auto inst = sem_ir().insts().Get(inst_id);
-
-  auto const_id = sem_ir().constant_values().Get(inst_id);
+auto FileContext::GetGlobal(SemIR::InstId inst_id,
+                            SemIR::SpecificId specific_id) -> llvm::Value* {
+  auto const_id = GetConstantValueInSpecific(sem_ir(), specific_id, inst_id);
   if (const_id.is_concrete()) {
     auto const_inst_id = sem_ir().constant_values().GetInstId(const_id);
 
@@ -142,7 +141,8 @@ auto FileContext::GetGlobal(SemIR::InstId inst_id) -> llvm::Value* {
     // If we want a pointer to the constant, materialize a global to hold it.
     // TODO: We could reuse the same global if the constant is used more than
     // once.
-    auto value_rep = SemIR::ValueRepr::ForType(sem_ir(), inst.type_id());
+    auto value_rep = SemIR::ValueRepr::ForType(
+        sem_ir(), sem_ir().insts().Get(const_inst_id).type_id());
     if (value_rep.kind == SemIR::ValueRepr::Pointer) {
       // Include both the name of the constant, if any, and the point of use in
       // the name of the variable.
@@ -173,9 +173,7 @@ auto FileContext::GetGlobal(SemIR::InstId inst_id) -> llvm::Value* {
     return const_value;
   }
 
-  // TODO: For generics, handle references to symbolic constants.
-
-  CARBON_FATAL("Missing value: {0} {1}", inst_id,
+  CARBON_FATAL("Missing value: {0} {1} {2}", inst_id, specific_id,
                sem_ir().insts().Get(inst_id));
 }
 
