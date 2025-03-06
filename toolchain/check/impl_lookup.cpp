@@ -8,6 +8,8 @@
 #include "toolchain/check/diagnostic_helpers.h"
 #include "toolchain/check/generic.h"
 #include "toolchain/check/import_ref.h"
+#include "toolchain/check/inst.h"
+#include "toolchain/check/type.h"
 #include "toolchain/check/type_completion.h"
 #include "toolchain/sem_ir/ids.h"
 #include "toolchain/sem_ir/impl.h"
@@ -296,6 +298,59 @@ static auto GetWitnessIdForImpl(
       context.sem_ir(), specific_id, impl.witness_id));
 }
 
+// In the case where `facet_const_id` is a facet, see if its facet type requires
+// that `specific_interface` is implemented. If so, return the witness from the
+// facet.
+static auto FindWitnessInFacet(
+    Context& context, SemIR::LocId loc_id, SemIR::ConstantId facet_const_id,
+    const SemIR::SpecificInterface& specific_interface) -> SemIR::InstId {
+  SemIR::InstId facet_inst_id =
+      context.constant_values().GetInstId(facet_const_id);
+  // TODO: Should we convert from a FacetAccessType to its facet here?
+  SemIR::TypeId facet_type_id = context.insts().Get(facet_inst_id).type_id();
+  if (auto facet_type_inst =
+          context.types().TryGetAs<SemIR::FacetType>(facet_type_id)) {
+    auto complete_facet_type_id = RequireCompleteFacetType(
+        context, facet_type_id, loc_id, *facet_type_inst,
+        [&]() -> DiagnosticBuilder {
+          // TODO: Find test that triggers this code path.
+          CARBON_FATAL("impl lookup for with incomplete facet type");
+        });
+    if (complete_facet_type_id.has_value()) {
+      const auto& complete_facet_type =
+          context.complete_facet_types().Get(complete_facet_type_id);
+      for (auto interface : complete_facet_type.required_interfaces) {
+        if (interface == specific_interface) {
+          // TODO: Need to get the right witness when there are multiple.
+          return GetOrAddInst(
+              context, loc_id,
+              SemIR::FacetAccessWitness{
+                  .type_id = GetSingletonType(
+                      context, SemIR::WitnessType::SingletonInstId),
+                  .facet_value_inst_id = facet_inst_id});
+        }
+      }
+    }
+  }
+  return SemIR::InstId::None;
+}
+
+static auto FindWitnessInImpls(
+    Context& context, SemIR::LocId loc_id, SemIR::ConstantId type_const_id,
+    const SemIR::SpecificInterface& specific_interface) -> SemIR::InstId {
+  auto& stack = context.impl_lookup_stack();
+  for (const auto& impl : context.impls().array_ref()) {
+    stack.back().impl_loc = impl.definition_id;
+    auto result_witness_id = GetWitnessIdForImpl(context, loc_id, type_const_id,
+                                                 specific_interface, impl);
+    if (result_witness_id.has_value()) {
+      // We found a matching impl; don't keep looking for this interface.
+      return result_witness_id;
+    }
+  }
+  return SemIR::InstId::None;
+}
+
 auto LookupImplWitness(Context& context, SemIR::LocId loc_id,
                        SemIR::ConstantId type_const_id,
                        SemIR::ConstantId interface_const_id) -> SemIR::InstId {
@@ -346,26 +401,25 @@ auto LookupImplWitness(Context& context, SemIR::LocId loc_id,
   // them in the same order as they are found in the `CompleteFacetType`, which
   // is the same order as in `interfaces` here.
   for (const auto& interface : interfaces) {
-    bool found_witness = false;
-    for (const auto& impl : context.impls().array_ref()) {
-      stack.back().impl_loc = impl.definition_id;
-      auto result_witness_id =
-          GetWitnessIdForImpl(context, loc_id, type_const_id, interface, impl);
-      if (result_witness_id.has_value()) {
-        result_witness_ids.push_back(result_witness_id);
-        // We found a matching impl; don't keep looking for this `interface`,
-        // move onto the next.
-        found_witness = true;
-        break;
-      }
+    // TODO: Since both `interfaces` and `type_const_id` are sorted lists, do an
+    // O(N+M) merge instead of O(N*M) nested loops.
+    auto result_witness_id =
+        FindWitnessInFacet(context, loc_id, type_const_id, interface);
+    if (!result_witness_id.has_value()) {
+      result_witness_id =
+          FindWitnessInImpls(context, loc_id, type_const_id, interface);
     }
-    if (!found_witness) {
+    if (result_witness_id.has_value()) {
+      result_witness_ids.push_back(result_witness_id);
+    } else {
       // At least one queried interface in the facet type has no witness for the
       // given type, we can stop looking for more.
       break;
     }
   }
   stack.pop_back();
+  // TODO: Validate that the witness satisfies the other requirements in
+  // `interface_const_id`.
 
   // All interfaces in the query facet type must have been found to be available
   // through some impl (TODO: or directly on the type itself if `type_const_id`
