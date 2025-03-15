@@ -26,10 +26,6 @@ interface I {
 
 interface J {
   alias U = I.T;
-  // CHECK:STDERR: fail_alias_to_different_interface.carbon:[[@LINE+11]]:13: error: semantics TODO: `impl lookup on incomplete facet type` [SemanticsTodo]
-  // CHECK:STDERR:   fn F() -> U;
-  // CHECK:STDERR:             ^
-  // CHECK:STDERR:
   // CHECK:STDERR: fail_alias_to_different_interface.carbon:[[@LINE+7]]:13: error: cannot implicitly convert type `Self` that implements `J` into type implementing `I` [ConversionFailureFacetToFacet]
   // CHECK:STDERR:   fn F() -> U;
   // CHECK:STDERR:             ^
@@ -55,10 +51,6 @@ impl forall [V:! J2] V as I2 where .T2 = () {}
 
 interface J2 {
   alias U2 = I2.T2;
-  // CHECK:STDERR: fail_todo_alias_to_different_interface_with_requires.carbon:[[@LINE+11]]:14: error: semantics TODO: `impl lookup on incomplete facet type` [SemanticsTodo]
-  // CHECK:STDERR:   fn F2() -> U2;
-  // CHECK:STDERR:              ^~
-  // CHECK:STDERR:
   // CHECK:STDERR: fail_todo_alias_to_different_interface_with_requires.carbon:[[@LINE+7]]:14: error: cannot implicitly convert type `Self` that implements `J2` into type implementing `I2` [ConversionFailureFacetToFacet]
   // CHECK:STDERR:   fn F2() -> U2;
   // CHECK:STDERR:              ^~
@@ -277,7 +269,7 @@ interface C {
 // CHECK:STDOUT:     %return.patt: <error> = return_slot_pattern
 // CHECK:STDOUT:     %return.param_patt: <error> = out_param_pattern %return.patt, call_param0
 // CHECK:STDOUT:   } {
-// CHECK:STDOUT:     %.loc22: %I.type = converted @J.%Self, <error> [concrete = <error>]
+// CHECK:STDOUT:     %.loc18: %I.type = converted @J.%Self, <error> [concrete = <error>]
 // CHECK:STDOUT:     %U.ref: <error> = name_ref U, <error> [concrete = <error>]
 // CHECK:STDOUT:     %return.param: ref <error> = out_param call_param0
 // CHECK:STDOUT:     %return: ref <error> = return_slot %return.param
@@ -475,10 +467,10 @@ interface C {
 // CHECK:STDOUT:     %return.patt: <error> = return_slot_pattern
 // CHECK:STDOUT:     %return.param_patt: <error> = out_param_pattern %return.patt, call_param0
 // CHECK:STDOUT:   } {
-// CHECK:STDOUT:     %Self.as_type.loc26_14.2: type = facet_access_type constants.%Self.541 [symbolic = %Self.as_type.loc26_14.1 (constants.%Self.as_type.f5c)]
-// CHECK:STDOUT:     %.loc26_14.1: type = converted constants.%Self.541, %Self.as_type.loc26_14.2 [symbolic = %Self.as_type.loc26_14.1 (constants.%Self.as_type.f5c)]
-// CHECK:STDOUT:     %.loc26_14.2: %J2.type = converted %.loc26_14.1, constants.%Self.541 [symbolic = %Self (constants.%Self.541)]
-// CHECK:STDOUT:     %.loc26_14.3: %I2.type = converted @J2.%Self, <error> [concrete = <error>]
+// CHECK:STDOUT:     %Self.as_type.loc22_14.2: type = facet_access_type constants.%Self.541 [symbolic = %Self.as_type.loc22_14.1 (constants.%Self.as_type.f5c)]
+// CHECK:STDOUT:     %.loc22_14.1: type = converted constants.%Self.541, %Self.as_type.loc22_14.2 [symbolic = %Self.as_type.loc22_14.1 (constants.%Self.as_type.f5c)]
+// CHECK:STDOUT:     %.loc22_14.2: %J2.type = converted %.loc22_14.1, constants.%Self.541 [symbolic = %Self (constants.%Self.541)]
+// CHECK:STDOUT:     %.loc22_14.3: %I2.type = converted @J2.%Self, <error> [concrete = <error>]
 // CHECK:STDOUT:     %U2.ref: <error> = name_ref U2, <error> [concrete = <error>]
 // CHECK:STDOUT:     %return.param: ref <error> = out_param call_param0
 // CHECK:STDOUT:     %return: ref <error> = return_slot %return.param
@@ -542,7 +534,7 @@ interface C {
 // CHECK:STDOUT:
 // CHECK:STDOUT: generic fn @F2(@J2.%Self: %J2.type) {
 // CHECK:STDOUT:   %Self: %J2.type = bind_symbolic_name Self, 0 [symbolic = %Self (constants.%Self.541)]
-// CHECK:STDOUT:   %Self.as_type.loc26_14.1: type = facet_access_type %Self [symbolic = %Self.as_type.loc26_14.1 (constants.%Self.as_type.f5c)]
+// CHECK:STDOUT:   %Self.as_type.loc22_14.1: type = facet_access_type %Self [symbolic = %Self.as_type.loc22_14.1 (constants.%Self.as_type.f5c)]
 // CHECK:STDOUT:
 // CHECK:STDOUT:   fn() -> <error>;
 // CHECK:STDOUT: }
@@ -598,7 +590,7 @@ interface C {
 // CHECK:STDOUT:
 // CHECK:STDOUT: specific @F2(constants.%Self.541) {
 // CHECK:STDOUT:   %Self => constants.%Self.541
-// CHECK:STDOUT:   %Self.as_type.loc26_14.1 => constants.%Self.as_type.f5c
+// CHECK:STDOUT:   %Self.as_type.loc22_14.1 => constants.%Self.as_type.f5c
 // CHECK:STDOUT: }
 // CHECK:STDOUT:
 // CHECK:STDOUT: --- fail_call_method_alias.carbon
