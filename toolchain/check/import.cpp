@@ -89,25 +89,29 @@ static auto CopyNameFromImportIR(Context& context,
   return import_name_id;
 }
 
-// Returns the LocIdandInst for the namespace.
+// Returns the LocIdAndInst for the namespace.
 static auto MakeImportedNamespaceLocIdAndInst(Context& context,
                                               SemIR::InstId import_id,
                                               SemIR::Namespace namespace_inst)
     -> SemIR::LocIdAndInst {
-  if (import_id.has_value()) {
-    SemIR::LocId import_loc_id = context.insts().GetLocId(import_id);
-    return import_loc_id.is_import_ir_inst_id()
-               ? MakeImportedLocIdAndInst(
-                     context, import_loc_id.import_ir_inst_id(), namespace_inst)
-               // TODO: Check that this actually is an `AnyNamespaceId`.
-               : SemIR::LocIdAndInst(
-                     Parse::AnyNamespaceId::UnsafeMake(import_loc_id.node_id()),
-                     namespace_inst);
+  if (!import_id.has_value()) {
+    // TODO: Associate the namespace with a proper location. This is related to:
+    // https://github.com/carbon-language/carbon-lang/issues/4666.
+    return SemIR::LocIdAndInst::NoLoc(namespace_inst);
   }
 
-  // TODO: Associate the namespace with a proper location. This is related to:
-  // https://github.com/carbon-language/carbon-lang/issues/4666.
-  return SemIR::LocIdAndInst::NoLoc(namespace_inst);
+  SemIR::LocId import_loc_id = context.insts().GetLocId(import_id);
+  if (!import_loc_id.has_value()) {
+    // TODO: Either document the use-case for this, or require a location.
+    return SemIR::LocIdAndInst::NoLoc(namespace_inst);
+  }
+  if (import_loc_id.is_import_ir_inst_id()) {
+    return MakeImportedLocIdAndInst(context, import_loc_id.import_ir_inst_id(),
+                                    namespace_inst);
+  }
+  return SemIR::LocIdAndInst(
+      context.parse_tree().As<Parse::AnyNamespaceId>(import_loc_id.node_id()),
+      namespace_inst);
 }
 
 auto AddImportNamespace(Context& context, SemIR::TypeId namespace_type_id,
