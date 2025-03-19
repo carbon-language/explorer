@@ -189,6 +189,7 @@ auto StringifyTypeExpr(const SemIR::File& sem_ir, InstId outer_inst_id)
       case SemIR::BoundMethodType::Kind:
       case SemIR::ErrorInst::Kind:
       case SemIR::IntLiteralType::Kind:
+      case SemIR::InstType::Kind:
       case SemIR::LegacyFloatType::Kind:
       case SemIR::NamespaceType::Kind:
       case SemIR::SpecificFunctionType::Kind:
@@ -575,6 +576,17 @@ auto StringifyTypeExpr(const SemIR::File& sem_ir, InstId outer_inst_id)
         }
         break;
       }
+      case SemIR::TypeOfInst::Kind: {
+        // Print the constant value if we've already computed the inst.
+        auto const_inst_id =
+            sem_ir.constant_values().GetConstantInstId(step.inst_id);
+        if (const_inst_id.has_value() && const_inst_id != step.inst_id) {
+          step_stack.PushInstId(const_inst_id);
+          break;
+        }
+        out << "<dependent type>";
+        break;
+      }
       case CARBON_KIND(UnboundElementType inst): {
         out << "<unbound element of class ";
         step_stack.PushString(">");
@@ -585,6 +597,7 @@ auto StringifyTypeExpr(const SemIR::File& sem_ir, InstId outer_inst_id)
         out << "<vtable ptr>";
         break;
       }
+      case AccessMemberAction::Kind:
       case AdaptDecl::Kind:
       case AddrOf::Kind:
       case AddrPattern::Kind:
@@ -608,6 +621,7 @@ auto StringifyTypeExpr(const SemIR::File& sem_ir, InstId outer_inst_id)
       case ClassElementAccess::Kind:
       case ClassInit::Kind:
       case CompleteTypeWitness::Kind:
+      case ConvertToValueAction::Kind:
       case Converted::Kind:
       case Deref::Kind:
       case FieldDecl::Kind:
@@ -619,12 +633,14 @@ auto StringifyTypeExpr(const SemIR::File& sem_ir, InstId outer_inst_id)
       case ImportDecl::Kind:
       case ImportRefLoaded::Kind:
       case InitializeFrom::Kind:
+      case InstValue::Kind:
       case InterfaceDecl::Kind:
       case NameBindingDecl::Kind:
       case OutParam::Kind:
       case OutParamPattern::Kind:
       case RefParam::Kind:
       case RefParamPattern::Kind:
+      case RefineTypeAction::Kind:
       case RequireCompleteType::Kind:
       case RequirementEquivalent::Kind:
       case RequirementImpls::Kind:
@@ -635,6 +651,7 @@ auto StringifyTypeExpr(const SemIR::File& sem_ir, InstId outer_inst_id)
       case ReturnSlotPattern::Kind:
       case SpecificConstant::Kind:
       case SpliceBlock::Kind:
+      case SpliceInst::Kind:
       case StringLiteral::Kind:
       case StructAccess::Kind:
       case StructInit::Kind:

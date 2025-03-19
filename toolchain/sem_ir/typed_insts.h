@@ -48,6 +48,19 @@
 
 namespace Carbon::SemIR {
 
+// An action that performs simple member access, `base.name`.
+struct AccessMemberAction {
+  static constexpr auto Kind =
+      InstKind::AccessMemberAction.Define<Parse::NodeId>(
+          {.ir_name = "access_member_action",
+           .constant_kind = InstConstantKind::InstAction,
+           .is_lowered = false});
+
+  TypeId type_id;
+  MetaInstId base_id;
+  NameId name_id;
+};
+
 // Common representation for declarations describing the foundation type of a
 // class -- either its adapted type or its base class.
 struct AnyFoundationDecl {
@@ -582,6 +595,20 @@ struct ConstType {
   TypeId inner_id;
 };
 
+// An action that performs simple conversion to a value expression of a given
+// type.
+struct ConvertToValueAction {
+  static constexpr auto Kind =
+      InstKind::ConvertToValueAction.Define<Parse::NodeId>(
+          {.ir_name = "convert_to_value_action",
+           .constant_kind = InstConstantKind::InstAction,
+           .is_lowered = false});
+
+  TypeId type_id;
+  MetaInstId inst_id;
+  TypeId target_type_id;
+};
+
 // Records that a type conversion `original as new_type` was done, producing the
 // result.
 struct Converted {
@@ -936,6 +963,32 @@ struct InitializeFrom {
   DestInstId dest_id;
 };
 
+// Used as the type of template actions that produce instructions.
+struct InstType {
+  static constexpr auto Kind = InstKind::InstType.Define<Parse::NoneNodeId>(
+      {.ir_name = "<instruction>",
+       .is_type = InstIsType::Always,
+       .constant_kind = InstConstantKind::Always});
+  static constexpr auto SingletonInstId = MakeSingletonInstId<Kind>();
+  static constexpr auto SingletonTypeId =
+      TypeId::ForTypeConstant(ConstantId::ForConcreteConstant(SingletonInstId));
+
+  TypeId type_id;
+};
+
+// A value of type `InstType` that refers to an instruction. This is used to
+// represent an instruction as a value for use as a result of a template action.
+struct InstValue {
+  static constexpr auto Kind = InstKind::InstValue.Define<Parse::NoneNodeId>(
+      {.ir_name = "inst_value",
+       .is_type = InstIsType::Never,
+       .constant_kind = InstConstantKind::Always,
+       .is_lowered = false});
+
+  TypeId type_id;
+  MetaInstId inst_id;
+};
+
 // An interface declaration.
 struct InterfaceDecl {
   static constexpr auto Kind =
@@ -1165,6 +1218,19 @@ struct PointerType {
   TypeId pointee_id;
 };
 
+// An action that performs type refinement for an instruction, by creating an
+// instruction that converts from a template symbolic type to a concrete type.
+struct RefineTypeAction {
+  static constexpr auto Kind = InstKind::RefineTypeAction.Define<Parse::NodeId>(
+      {.ir_name = "refine_type_action",
+       .constant_kind = InstConstantKind::InstAction,
+       .is_lowered = false});
+
+  TypeId type_id;
+  MetaInstId inst_id;
+  TypeId inst_type_id;
+};
+
 // Requires a type to be complete. This is only created for generic types and
 // produces a witness that the type is complete.
 //
@@ -1375,6 +1441,19 @@ struct SpliceBlock {
   InstId result_id;
 };
 
+// Splices an instruction computed by an action into the location where this
+// appears.
+struct SpliceInst {
+  static constexpr auto Kind =
+      InstKind::SpliceInst.Define<Parse::NodeId>({.ir_name = "splice_inst"});
+
+  TypeId type_id;
+  // The instruction that computes the instruction to splice. The type of this
+  // instruction should be InstType. If evaluation has succeeded, this will be
+  // an InstValue.
+  InstId inst_id;
+};
+
 // A literal string value.
 struct StringLiteral {
   static constexpr auto Kind =
@@ -1543,6 +1622,24 @@ struct TupleValue {
 
   TypeId type_id;
   InstBlockId elements_id;
+};
+
+// Returns the type of the instruction produced by an action. For example, given
+//
+//   %inst: <instruction> = some_action
+//
+// the instruction `type_of_inst %inst` evaluates to the type of the instruction
+// that the action generates.
+struct TypeOfInst {
+  static constexpr auto Kind = InstKind::TypeOfInst.Define<Parse::NodeId>(
+      {.ir_name = "type_of_inst",
+       .is_type = InstIsType::Always,
+       .constant_kind = InstConstantKind::SymbolicOnly});
+
+  TypeId type_id;
+  // The instruction that computes the instruction whose type is returned. The
+  // type of this instruction should be InstType.
+  InstId inst_id;
 };
 
 // Tracks expressions which are valid as types. This has a deliberately

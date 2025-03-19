@@ -53,6 +53,21 @@ auto GetOrAddInst(Context& context, LocT loc, InstT inst) -> SemIR::InstId {
   return GetOrAddInst(context, SemIR::LocIdAndInst(loc, inst));
 }
 
+// Adds an instruction and enqueues it to be added to the eval block of the
+// enclosing generic, returning the produced ID. The instruction is expected to
+// be a dependent template instantiation action.
+auto AddDependentActionInst(Context& context,
+                            SemIR::LocIdAndInst loc_id_and_inst)
+    -> SemIR::InstId;
+
+// Convenience wrapper for AddDependentActionInst.
+template <typename InstT, typename LocT>
+auto AddDependentActionInst(Context& context, LocT loc, InstT inst)
+    -> decltype(AddDependentActionInst(context,
+                                       SemIR::LocIdAndInst(loc, inst))) {
+  return AddDependentActionInst(context, SemIR::LocIdAndInst(loc, inst));
+}
+
 // Adds an instruction to the current pattern block, returning the produced
 // ID.
 // TODO: Is it possible to remove this and pattern_block_stack, now that

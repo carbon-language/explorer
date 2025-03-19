@@ -4,6 +4,7 @@
 
 #include "toolchain/check/eval_inst.h"
 
+#include "toolchain/check/action.h"
 #include "toolchain/check/facet_type.h"
 #include "toolchain/check/generic.h"
 #include "toolchain/check/import_ref.h"
@@ -365,6 +366,23 @@ auto EvalConstantInst(Context& context, SemIRLoc /*loc*/,
 }
 
 auto EvalConstantInst(Context& context, SemIRLoc /*loc*/,
+                      SemIR::SpliceInst inst) -> ConstantEvalResult {
+  // The constant value of a SpliceInst is the constant value of the instruction
+  // being spliced. Note that `inst.inst_id` is the instruction being spliced,
+  // so we need to go through another round of obtaining the constant value in
+  // addition to the one performed by the eval infrastructure.
+  if (auto inst_value =
+          context.insts().TryGetAs<SemIR::InstValue>(inst.inst_id)) {
+    return ConstantEvalResult::Existing(
+        context.constant_values().Get(inst_value->inst_id));
+  }
+  // TODO: Consider creating a new `ValueOfInst` instruction analogous to
+  // `TypeOfInst` to defer determining the constant value until we know the
+  // instruction. Alternatively, produce a symbolic `SpliceInst` constant.
+  return ConstantEvalResult::NotConstant;
+}
+
+auto EvalConstantInst(Context& context, SemIRLoc /*loc*/,
                       SemIR::StructAccess inst) -> ConstantEvalResult {
   return PerformAggregateAccess(context, inst);
 }
@@ -390,6 +408,17 @@ auto EvalConstantInst(Context& /*context*/, SemIRLoc /*loc*/,
                       SemIR::TupleInit inst) -> ConstantEvalResult {
   return ConstantEvalResult::NewSamePhase(SemIR::TupleValue{
       .type_id = inst.type_id, .elements_id = inst.elements_id});
+}
+
+auto EvalConstantInst(Context& context, SemIRLoc /*loc*/,
+                      SemIR::TypeOfInst inst) -> ConstantEvalResult {
+  // Grab the type from the instruction produced as our operand.
+  if (auto inst_value =
+          context.insts().TryGetAs<SemIR::InstValue>(inst.inst_id)) {
+    return ConstantEvalResult::Existing(context.types().GetConstantId(
+        context.insts().Get(inst_value->inst_id).type_id()));
+  }
+  return ConstantEvalResult::NewSamePhase(inst);
 }
 
 auto EvalConstantInst(Context& context, SemIRLoc /*loc*/,
