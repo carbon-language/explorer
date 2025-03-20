@@ -4,6 +4,9 @@
 
 #include "toolchain/check/impl_lookup.h"
 
+#include <algorithm>
+
+#include "toolchain/base/kind_switch.h"
 #include "toolchain/check/deduce.h"
 #include "toolchain/check/diagnostic_helpers.h"
 #include "toolchain/check/generic.h"
@@ -11,6 +14,7 @@
 #include "toolchain/check/inst.h"
 #include "toolchain/check/type.h"
 #include "toolchain/check/type_completion.h"
+#include "toolchain/check/type_structure.h"
 #include "toolchain/sem_ir/ids.h"
 #include "toolchain/sem_ir/impl.h"
 #include "toolchain/sem_ir/inst.h"
@@ -300,14 +304,26 @@ static auto FindWitnessInFacet(
   return SemIR::InstId::None;
 }
 
+// Finds the best impl among all available impls that provides the
+// `specific_interface` for the type in `type_const_id`, and returns a witness
+// for that impl. Returns `None` if no match was found.
 static auto FindWitnessInImpls(
     Context& context, SemIR::LocId loc_id,
     SemIR::ConstantId query_self_const_id,
     const SemIR::SpecificInterface& specific_interface) -> SemIR::InstId {
   auto& stack = context.impl_lookup_stack();
-  // TODO: Build this candidate list by matching against type structures to
-  // narrow it down.
-  llvm::SmallVector<std::pair<SemIR::ImplId, SemIR::InstId>> candidate_impl_ids;
+
+  struct CandidateImpl {
+    SemIR::ImplId impl_id;
+    SemIR::InstId loc_inst_id;
+    TypeStructure type_structure;
+  };
+
+  auto query_type_structure = BuildTypeStructure(
+      context, context.constant_values().GetInstId(query_self_const_id),
+      specific_interface);
+
+  llvm::SmallVector<CandidateImpl> candidate_impl_ids;
   for (auto [id, impl] : context.impls().enumerate()) {
     // If the impl's interface_id differs from the query, then this impl can not
     // possibly provide the queried interface.
@@ -338,18 +354,38 @@ static auto FindWitnessInImpls(
     }
     CARBON_CHECK(impl.witness_id.has_value());
 
-    candidate_impl_ids.push_back({id, impl.definition_id});
+    auto type_structure =
+        BuildTypeStructure(context, impl.self_id, impl.interface);
+    if (!query_type_structure.IsCompatibleWith(type_structure)) {
+      continue;
+    }
+
+    candidate_impl_ids.push_back(
+        {id, impl.definition_id, std::move(type_structure)});
   }
 
-  for (auto [impl_id, loc_inst_id] : candidate_impl_ids) {
-    stack.back().impl_loc = loc_inst_id;
+  auto compare = [](auto& lhs, auto& rhs) -> bool {
+    // TODO: Allow Carbon code to provide a priority ordering explicitly. For
+    // now they have all the same priority, so the priority is the order in
+    // which they are found in code.
+
+    // Sort by their type structures. Higher value in type structure comes
+    // first, so we use `>` comparison.
+    return lhs.type_structure > rhs.type_structure;
+  };
+  // Stable sort is used so that impls that are seen first are preferred when
+  // they have an equal priority ordering.
+  std::ranges::stable_sort(candidate_impl_ids, compare);
+
+  for (const auto& candidate : candidate_impl_ids) {
+    stack.back().impl_loc = candidate.loc_inst_id;
     // NOTE: GetWitnessIdForImpl() does deduction, which can cause new impls to
     // be imported, invalidating any pointer into `context.impls()`.
-    auto result_witness_id = GetWitnessIdForImpl(
-        context, loc_id, query_self_const_id, specific_interface, impl_id);
-    if (result_witness_id.has_value()) {
-      // We found a matching impl; don't keep looking for this interface.
-      return result_witness_id;
+    auto witness_id =
+        GetWitnessIdForImpl(context, loc_id, query_self_const_id,
+                            specific_interface, candidate.impl_id);
+    if (witness_id.has_value()) {
+      return witness_id;
     }
   }
   return SemIR::InstId::None;
