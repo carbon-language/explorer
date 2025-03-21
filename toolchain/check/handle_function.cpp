@@ -503,7 +503,9 @@ static auto BuildFunctionDecl(Context& context,
         GetFunctionType(context, function_decl.function_id,
                         context.scope_stack().PeekSpecificId());
   } else {
-    FinishGenericRedecl(context, decl_id, function_info.generic_id);
+    auto prev_decl_generic_id =
+        context.functions().Get(function_decl.function_id).generic_id;
+    FinishGenericRedecl(context, prev_decl_generic_id);
     // TODO: Validate that the redeclaration doesn't set an access modifier.
   }
 
