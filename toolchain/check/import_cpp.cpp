@@ -348,17 +348,17 @@ static auto ImportNameDecl(Context& context, SemIR::LocId loc_id,
 auto ImportNameFromCpp(Context& context, SemIR::LocId loc_id,
                        SemIR::NameScopeId scope_id, SemIR::NameId name_id)
     -> SemIR::InstId {
-  auto lookup = ClangLookup(context, loc_id, scope_id, name_id);
-  if (!lookup) {
-    return SemIR::InstId::None;
-  }
-
   DiagnosticAnnotationScope annotate_diagnostics(
       &context.emitter(), [&](auto& builder) {
         CARBON_DIAGNOSTIC(InCppNameLookup, Note,
                           "in `Cpp` name lookup for `{0}`", SemIR::NameId);
         builder.Note(loc_id, InCppNameLookup, name_id);
       });
+
+  auto lookup = ClangLookup(context, loc_id, scope_id, name_id);
+  if (!lookup) {
+    return SemIR::InstId::None;
+  }
 
   if (!lookup->isSingleResult()) {
     context.TODO(loc_id,
