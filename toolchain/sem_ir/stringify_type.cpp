@@ -375,6 +375,11 @@ class Stringifier {
       -> void {
     auto witness_inst_id =
         sem_ir_->constant_values().GetConstantInstId(inst.witness_id);
+    if (sem_ir_->insts().Is<SemIR::ImplSymbolicWitness>(witness_inst_id)) {
+      // TODO: Include the query in the diagnostic output?
+      step_stack_->PushString("<symbolic>");
+      return;
+    }
     auto witness = sem_ir_->insts().GetAs<FacetAccessWitness>(witness_inst_id);
     auto witness_type_id =
         sem_ir_->insts().Get(witness.facet_value_inst_id).type_id();
