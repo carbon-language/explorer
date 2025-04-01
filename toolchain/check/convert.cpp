@@ -24,6 +24,7 @@
 #include "toolchain/check/type_completion.h"
 #include "toolchain/diagnostics/format_providers.h"
 #include "toolchain/sem_ir/copy_on_write_block.h"
+#include "toolchain/sem_ir/expr_info.h"
 #include "toolchain/sem_ir/file.h"
 #include "toolchain/sem_ir/generic.h"
 #include "toolchain/sem_ir/ids.h"
@@ -35,55 +36,6 @@
 // NOLINTBEGIN(misc-no-recursion)
 
 namespace Carbon::Check {
-
-// Given an initializing expression, find its return slot argument. Returns
-// `None` if there is no return slot, because the initialization is not
-// performed in place.
-static auto FindReturnSlotArgForInitializer(SemIR::File& sem_ir,
-                                            SemIR::InstId init_id)
-    -> SemIR::InstId {
-  while (true) {
-    SemIR::Inst init_untyped = sem_ir.insts().Get(init_id);
-    CARBON_KIND_SWITCH(init_untyped) {
-      case CARBON_KIND(SemIR::AsCompatible init): {
-        init_id = init.source_id;
-        continue;
-      }
-      case CARBON_KIND(SemIR::Converted init): {
-        init_id = init.result_id;
-        continue;
-      }
-      case CARBON_KIND(SemIR::ArrayInit init): {
-        return init.dest_id;
-      }
-      case CARBON_KIND(SemIR::ClassInit init): {
-        return init.dest_id;
-      }
-      case CARBON_KIND(SemIR::StructInit init): {
-        return init.dest_id;
-      }
-      case CARBON_KIND(SemIR::TupleInit init): {
-        return init.dest_id;
-      }
-      case CARBON_KIND(SemIR::InitializeFrom init): {
-        return init.dest_id;
-      }
-      case CARBON_KIND(SemIR::Call call): {
-        if (!SemIR::ReturnTypeInfo::ForType(sem_ir, call.type_id)
-                 .has_return_slot()) {
-          return SemIR::InstId::None;
-        }
-        if (!call.args_id.has_value()) {
-          // Argument initialization failed, so we have no return slot.
-          return SemIR::InstId::None;
-        }
-        return sem_ir.inst_blocks().Get(call.args_id).back();
-      }
-      default:
-        CARBON_FATAL("Initialization from unexpected inst {0}", init_untyped);
-    }
-  }
-}
 
 // Marks the initializer `init_id` as initializing `target_id`.
 static auto MarkInitializerFor(SemIR::File& sem_ir, SemIR::InstId init_id,
