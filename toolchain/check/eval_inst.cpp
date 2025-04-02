@@ -11,6 +11,7 @@
 #include "toolchain/check/generic.h"
 #include "toolchain/check/impl_lookup.h"
 #include "toolchain/check/import_ref.h"
+#include "toolchain/check/inst.h"
 #include "toolchain/check/type.h"
 #include "toolchain/check/type_completion.h"
 #include "toolchain/sem_ir/ids.h"
@@ -393,12 +394,24 @@ auto EvalConstantInst(Context& context, SemIRLoc loc,
   args.append(interface_fn_args.end() - remaining_params,
               interface_fn_args.end());
   auto specific_id = MakeSpecific(context, loc, generic_id, args);
+  context.definitions_required_by_use().push_back({loc, specific_id});
 
-  // TODO: Add the new `SpecificFunction` to definitions_required.
   return ConstantEvalResult::NewSamePhase(
       SemIR::SpecificFunction{.type_id = inst.type_id,
                               .callee_id = inst.callee_id,
                               .specific_id = specific_id});
+}
+
+auto EvalConstantInst(Context& context, SemIRLoc loc,
+                      SemIR::SpecificFunction inst) -> ConstantEvalResult {
+  if (!SemIR::GetCalleeFunction(context.sem_ir(), inst.callee_id)
+           .self_type_id.has_value()) {
+    // This is not an associated function. Those will be required to be defined
+    // as part of checking that the impl is complete.
+    context.definitions_required_by_use().push_back({loc, inst.specific_id});
+  }
+  // Create new constant for a specific function.
+  return ConstantEvalResult::NewSamePhase(inst);
 }
 
 auto EvalConstantInst(Context& context, SemIRLoc /*loc*/,
