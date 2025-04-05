@@ -256,8 +256,13 @@ struct AssociatedEntityType {
 
   TypeId type_id;
   // The interface in which the entity was declared.
-  // TODO: Consider storing a `SpecificInterfaceId` instead.
-  TypeId interface_type_id;
+  InterfaceId interface_id;
+  // The specific for the interface in which the entity was declared.
+  SpecificId interface_specific_id;
+
+  auto GetSpecificInterface() -> SpecificInterface {
+    return {.interface_id = interface_id, .specific_id = interface_specific_id};
+  }
 };
 
 // Used for the type of patterns that do not match a fixed type.
@@ -1012,8 +1017,6 @@ struct InterfaceDecl {
           {.ir_name = "interface_decl", .is_lowered = false});
 
   TypeId type_id;
-  // TODO: For a generic interface declaration, the name of the interface
-  // declaration should become a parameterized entity name value.
   InterfaceId interface_id;
   // The declaration block, containing the interface name's qualifiers and the
   // interface's generic parameters.
