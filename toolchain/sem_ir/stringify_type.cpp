@@ -312,18 +312,29 @@ class Stringifier {
       step_stack_->Push(" ", lhs_const_id, " = ", rhs_const_id);
       some_where = true;
     }
+    if (!facet_type_info.self_impls_constraints.empty()) {
+      if (some_where) {
+        step_stack_->PushString(" and");
+      }
+      llvm::ListSeparator sep(" & ");
+      for (auto impls : llvm::reverse(facet_type_info.self_impls_constraints)) {
+        step_stack_->Push(impls, &sep);
+      }
+      step_stack_->PushString(" .Self impls ");
+      some_where = true;
+    }
     // TODO: Other restrictions from facet_type_info.
     if (some_where) {
       step_stack_->PushString(" where");
     }
 
-    // Output interface requirements.
-    if (facet_type_info.impls_constraints.empty()) {
+    // Output extend interface requirements.
+    if (facet_type_info.extend_constraints.empty()) {
       step_stack_->PushString("type");
       return;
     }
     llvm::ListSeparator sep(" & ");
-    for (auto impls : llvm::reverse(facet_type_info.impls_constraints)) {
+    for (auto impls : llvm::reverse(facet_type_info.extend_constraints)) {
       step_stack_->Push(impls, &sep);
     }
   }
@@ -402,9 +413,11 @@ class Stringifier {
           sem_ir_->insts().Get(witness->facet_value_inst_id).type_id();
       auto facet_type = sem_ir_->types().GetAs<FacetType>(witness_type_id);
       // TODO: Support != 1 interface better.
-      return sem_ir_->facet_types()
-          .Get(facet_type.facet_type_id)
-          .TryAsSingleInterface();
+      const auto& facet_type_info =
+          sem_ir_->facet_types().Get(facet_type.facet_type_id);
+      if (facet_type_info.extend_constraints.size() == 1) {
+        return facet_type_info.extend_constraints.front();
+      }
     }
 
     // TODO: Handle other cases.

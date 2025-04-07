@@ -592,9 +592,16 @@ static auto GetConstantFacetTypeInfo(EvalContext& eval_context,
                                      Phase* phase) -> SemIR::FacetTypeInfo {
   const auto& orig = eval_context.facet_types().Get(facet_type_id);
   SemIR::FacetTypeInfo info;
-  info.impls_constraints.reserve(orig.impls_constraints.size());
-  for (const auto& interface : orig.impls_constraints) {
-    info.impls_constraints.push_back(
+  info.extend_constraints.reserve(orig.extend_constraints.size());
+  for (const auto& interface : orig.extend_constraints) {
+    info.extend_constraints.push_back(
+        {.interface_id = interface.interface_id,
+         .specific_id =
+             GetConstantValue(eval_context, interface.specific_id, phase)});
+  }
+  info.self_impls_constraints.reserve(orig.self_impls_constraints.size());
+  for (const auto& interface : orig.self_impls_constraints) {
+    info.self_impls_constraints.push_back(
         {.interface_id = interface.interface_id,
          .specific_id =
              GetConstantValue(eval_context, interface.specific_id, phase)});
@@ -1816,6 +1823,34 @@ auto TryEvalTypedInst<SemIR::BindSymbolicName>(EvalContext& eval_context,
   return MakeConstantResult(eval_context.context(), bind, phase);
 }
 
+static auto IsPeriodSelf(EvalContext& eval_context, SemIR::ConstantId const_id)
+    -> bool {
+  // This also rejects the singleton Error value as it's concrete.
+  if (!const_id.is_symbolic()) {
+    return false;
+  }
+  const auto& symbolic =
+      eval_context.constant_values().GetSymbolicConstant(const_id);
+  // Fast early reject before doing more expensive operations.
+  if (symbolic.dependence != SemIR::ConstantDependence::PeriodSelf) {
+    return false;
+  }
+  auto inst_id = symbolic.inst_id;
+  // Unwrap the `FacetAccessType` instruction, which we get when the `.Self` is
+  // converted to `type`.
+  if (auto facet_access_type =
+          eval_context.insts().TryGetAs<SemIR::FacetAccessType>(inst_id)) {
+    inst_id = facet_access_type->facet_value_inst_id;
+  }
+  if (auto bind_symbolic_name =
+          eval_context.insts().TryGetAs<SemIR::BindSymbolicName>(inst_id)) {
+    const auto& bind_name =
+        eval_context.entity_names().Get(bind_symbolic_name->entity_name_id);
+    return bind_name.name_id == SemIR::NameId::PeriodSelf;
+  }
+  return false;
+}
+
 // TODO: Convert this to an EvalConstantInst instruction. This will require
 // providing a `GetConstantValue` overload for a requirement block.
 template <>
@@ -1856,6 +1891,37 @@ auto TryEvalTypedInst<SemIR::WhereExpr>(EvalContext& eval_context,
         UpdatePhaseIgnorePeriodSelf(eval_context, rhs, &phase);
         info.rewrite_constraints.push_back(
             {.lhs_const_id = lhs, .rhs_const_id = rhs});
+      } else if (auto impls =
+                     eval_context.insts().TryGetAs<SemIR::RequirementImpls>(
+                         inst_id)) {
+        SemIR::ConstantId lhs = eval_context.GetConstantValue(impls->lhs_id);
+        SemIR::ConstantId rhs = eval_context.GetConstantValue(impls->rhs_id);
+        if (rhs != SemIR::ErrorInst::SingletonConstantId &&
+            IsPeriodSelf(eval_context, lhs)) {
+          auto rhs_inst_id = eval_context.constant_values().GetInstId(rhs);
+          if (rhs_inst_id == SemIR::TypeType::SingletonInstId) {
+            // `.Self impls type` -> nothing to do.
+          } else {
+            auto facet_type =
+                eval_context.insts().GetAs<SemIR::FacetType>(rhs_inst_id);
+            SemIR::FacetTypeInfo more_info = GetConstantFacetTypeInfo(
+                eval_context, facet_type.facet_type_id, &phase);
+            // The way to prevent lookup into the interface requirements of a
+            // facet type is to put it to the right of a `.Self impls`, which we
+            // accomplish by putting them into `self_impls_constraints`.
+            llvm::append_range(info.self_impls_constraints,
+                               more_info.extend_constraints);
+            llvm::append_range(info.self_impls_constraints,
+                               more_info.self_impls_constraints);
+            // Other requirements are copied in.
+            llvm::append_range(info.rewrite_constraints,
+                               more_info.rewrite_constraints);
+            info.other_requirements |= more_info.other_requirements;
+          }
+        } else {
+          // TODO: Handle `impls` constraints beyond `.Self impls`.
+          info.other_requirements = true;
+        }
       } else {
         // TODO: Handle other requirements
         info.other_requirements = true;

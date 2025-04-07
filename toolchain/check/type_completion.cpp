@@ -616,20 +616,11 @@ auto RequireIdentifiedFacetType(Context& context,
   const auto& facet_type_info =
       context.facet_types().Get(facet_type.facet_type_id);
 
-  SemIR::IdentifiedFacetType result;
   // TODO: expand named constraints
-  result.set_required_interfaces(facet_type_info.impls_constraints);
-
-  // TODO: Distinguish interfaces that are required but would not be
-  // implemented, such as those from `where .Self impls I`.
-  if (result.required_interfaces().size() == 1) {
-    result.set_interface_to_impl(result.required_interfaces().front());
-  } else {
-    result.set_num_interfaces_to_impl(result.required_interfaces().size());
-  }
-
   // TODO: Process other kinds of requirements.
-  return context.identified_facet_types().Add(facet_type.facet_type_id, result);
+  return context.identified_facet_types().Add(
+      facet_type.facet_type_id, {facet_type_info.extend_constraints,
+                                 facet_type_info.self_impls_constraints});
 }
 
 auto AsCompleteType(Context& context, SemIR::TypeId type_id,
