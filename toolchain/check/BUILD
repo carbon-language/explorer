@@ -17,6 +17,7 @@ cc_library(
     srcs = [
         "action.cpp",
         "call.cpp",
+        "class.cpp",
         "context.cpp",
         "control_flow.cpp",
         "convert.cpp",
@@ -53,6 +54,7 @@ cc_library(
     hdrs = [
         "action.h",
         "call.h",
+        "class.h",
         "context.h",
         "control_flow.h",
         "convert.h",
