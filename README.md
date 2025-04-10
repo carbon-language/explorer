@@ -15,7 +15,7 @@ which is tagged as
 [explorer-archived](https://github.com/carbon-language/carbon-lang/releases/tag/explorer-archived)
 in the main `carbon-lang` repository.
 
-The explorer was the initial implementation of the Carbon language, and uses an
+The explorer was a prototype implementation of the Carbon language, and uses an
 AST-based approach in its implementation. The explorer is not complete; it was a
 partial implementation when development stopped, and the design has since
 evolved.
