@@ -13,6 +13,13 @@ This is an archived copy of the explorer codebase. It was forked at commit
 [76c68153](https://github.com/carbon-language/explorer/commit/76c68153a2cf5b35249be3e9b8097238f3dc1ee1),
 which is tagged as
 [explorer-archived](https://github.com/carbon-language/carbon-lang/releases/tag/explorer-archived)
-in the main `carbon-lang` repository. See proposal
+in the main `carbon-lang` repository.
+
+The explorer was the initial implementation of the Carbon language, and uses an
+AST-based approach in its implementation. The explorer is not complete; it was a
+partial implementation when development stopped, and the design has since
+evolved.
+
+See proposal
 [#5270: Move explorer out of toolchain git repository](https://github.com/carbon-language/carbon-lang/pull/5270)
-for context.
+for additional context.
